@@ -30,7 +30,7 @@ async function register(req, res) {
 
         const normalizedRole= role === 'admin' ? 'admin' : 'student';
 
-        const existingUser=await pool.query('SELECT * FROM users WHERE email=$1',[email.tolowerCase()]);
+        const existingUser=await pool.query('SELECT * FROM users WHERE email=$1',[email.toLowerCase()]);
         if(existingUser.rows.length>0){
             return res.status(400).json({
                 message:'User with this email already exists'
@@ -41,8 +41,8 @@ async function register(req, res) {
 
         const result=await pool.query(
             `INSERT INTO users (name,email,password,role)
-             VALUES ($1,$2,$3,$4) RETURNING *`,
-            [name,email.tolowerCase(),passwordHash,normalizedRole]
+             VALUES ($1,$2,$3,$4) RETURNING id,name,email,role, created_at`,
+            [name,email.toLowerCase(),passwordHash,normalizedRole]
         );
 
         const user=result.rows[0];
