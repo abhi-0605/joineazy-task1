@@ -1,7 +1,9 @@
 const pool = require('../config/db');
 
 async function createGroup(req, res) {
+    const client = await pool.connect();
     try{
+
         const {name}=req.body;
 
         if(!name){
@@ -9,6 +11,7 @@ async function createGroup(req, res) {
                 message:'Group name is required'
             })
         }
+        
 
         await client.query('BEGIN');
 
@@ -53,7 +56,7 @@ async function addMember(req,res){
         }
         const membership= await pool.query(
             'SELECT * FROM group_members WHERE group_id=$1 AND user_id=$2',
-            [groupId,userId]
+            [groupId,req.user.id]
         );
 
         if(membership.rows.length===0){
@@ -63,8 +66,8 @@ async function addMember(req,res){
         }
 
         const userQuery = userId 
-        ? ("SELECT id,name,email FROM users WHERE id=$1 AND role='student' ",[userId]) 
-        : ("SELECT id,name,email FROM users WHERE email=$1 AND role='student' ",[email.toLowerCase()]);
+        ? await pool.query("SELECT id,name,email FROM users WHERE id=$1 AND role='student' ",[userId]) 
+        : await pool.query("SELECT id,name,email FROM users WHERE email=$1 AND role='student' ",[email.toLowerCase()]);
 
         if(userQuery.rows.length===0){
             return res.status(404).json({

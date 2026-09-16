@@ -13,7 +13,7 @@ const router = express.Router();
 router.use(authenticate);   
 
 router.post('/', requireRole('student'), createGroup);
-router.post('/mine', requireRole('student'), myGroups);
+router.get('/mine', requireRole('student'), myGroups);
 router.post('/:groupId/add-member', requireRole('student'), addMember);
 router.delete('/:groupId/remove-member/:userId', requireRole('student'), removeMember);
 
