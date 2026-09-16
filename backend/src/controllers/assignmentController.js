@@ -3,7 +3,7 @@ const pool=require('../config/db');
 async function createAssignment(req,res){
     const client=await pool.connect();
     try{
-        const {title,description,dueDate,onedriveLink,targetType, groupId}=req.body;
+        const {title,description,dueDate,onedriveLink,targetType, groupIds}=req.body;
 
         if(!title || !dueDate){
             return res.status(400).json({
@@ -16,15 +16,15 @@ async function createAssignment(req,res){
         const result=await client.query(
             `INSERT INTO assignments (title,description,due_date,onedrive_link,target_type,created_by)\
             VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-            [title,description || null, dueDate, onedriveLink || null, targetType==='group' ? 'group' : 'all', req.user.id]
+            [title,description || null, dueDate, onedriveLink || null, targetType==='groups' ? 'groups' : 'all', req.user.id]
         );
 
         const assignment=result.rows[0];
 
         let targetUserIds=[];
 
-        if(assignment.target_type==='group' && Array.isArray(groupId) && groupId.length>0){
-            for(const groupId of groupId){
+        if(assignment.target_type==='groups' && Array.isArray(groupIds) && groupIds.length>0){
+            for(const groupId of groupIds){
                 await client.query(
                     'INSERT INTO assignment_groups (assignment_id,group_id) VALUES ($1,$2)',
                     [assignment.id,groupId]
@@ -32,9 +32,9 @@ async function createAssignment(req,res){
             }
             const members=await client.query(
                 'SELECT user_id FROM group_members WHERE group_id=ANY($1::int[])',
-                [groupId]
+                [groupIds]
             );
-            targetUserIds=members.rows.map((r) => req.user_id);
+            targetUserIds=members.rows.map((r) => r.user_id);
         }else{
             const allStudents=await client.query(
                 'SELECT id FROM users WHERE role=$1',
@@ -46,7 +46,7 @@ async function createAssignment(req,res){
 
         for(const userId of targetUserIds){
             await client.query(
-                `INSERT INTO assignment (assignment_id,user_id,status)
+                `INSERT INTO submissions (assignment_id,user_id,status)
                  VALUES ($1,$2,'pending')
                  ON CONFLICT (assignment_id,user_id) DO NOTHING`,
                 [assignment.id, userId]
@@ -107,7 +107,7 @@ async function updateAssignment(req,res){
 async function studentAssignments(req,res){
     try{
         const result=await pool.query(
-            `SELECT a.*, s.status FROM submission_status
+            `SELECT a.*, s.status AS submission_status
             FROM assignments a
             JOIN submissions s ON s.assignment_id=a.id
             WHERE s.user_id=$1
@@ -137,7 +137,7 @@ async function adminAssignments(req,res){
         const withProgress=await Promise.all(
             assignments.rows.map(async (a) => {
                 const progress=await pool.query(
-                    `SELECT COUNT(*) FILTER (WHERE status='submitted') AS submitted,
+                    `SELECT COUNT(*) FILTER (WHERE status='confirmed') AS confirmed,
                     COUNT(*) AS total
                     FROM submissions WHERE assignment_id=$1`,
                     [a.id]
